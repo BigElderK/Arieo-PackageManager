@@ -320,6 +320,7 @@ def generate_package_lock(install_order, packages_data, packages_src_folder, pac
             "tag": pkg_info['tag'],
             "source_folder": str(pkg_info['path'].resolve()),
             "install_folder": str((Path(packages_install_folder).resolve() / pkg_info['folder_name'])),
+            "build_folder": str((Path(packages_build_folder).resolve() / pkg_info['folder_name'])),
             "environment_variables": [
                 {
                     "type": "public",

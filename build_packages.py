@@ -15,13 +15,14 @@ from pathlib import Path
 import yaml
 
 
-def install_package_from_src_folder(src_folder, output_folder=None, env_vars_map=None):
+def install_package_from_src_folder(src_folder, build_folder=None, install_folder=None, env_vars_map=None):
     """
     Install a package from a source folder containing package.json
     
     Args:
         src_folder: Path to the package source folder (relative or absolute)
-        output_folder: Path to the output folder (sets OUTPUT_FOLDER env var)
+        build_folder: Path to the build folder (sets BUILD_FOLDER env var)
+        install_folder: Path to the install folder (sets INSTALL_FOLDER env var)
         env_vars_map: Dict mapping environment variable names to values
     """
     # Convert to Path object and resolve to absolute path
@@ -75,12 +76,16 @@ def install_package_from_src_folder(src_folder, output_folder=None, env_vars_map
                 env[env_name] = env_value
                 print(f"  {env_name}={env_value}")
         
-        # Legacy support: also set OUTPUT_FOLDER if provided directly
-        if output_folder and (not env_vars_map or 'OUTPUT_FOLDER' not in env_vars_map):
-            # Resolve to absolute path
-            output_path = Path(output_folder).resolve()
-            env['OUTPUT_FOLDER'] = str(output_path)
-            print(f"  OUTPUT_FOLDER={output_path}")
+        # Set BUILD_FOLDER and INSTALL_FOLDER if provided directly
+        if build_folder and (not env_vars_map or 'BUILD_FOLDER' not in env_vars_map):
+            build_path = Path(build_folder).resolve()
+            env['BUILD_FOLDER'] = str(build_path)
+            print(f"  BUILD_FOLDER={build_path}")
+        
+        if install_folder and (not env_vars_map or 'INSTALL_FOLDER' not in env_vars_map):
+            install_path = Path(install_folder).resolve()
+            env['INSTALL_FOLDER'] = str(install_path)
+            print(f"  INSTALL_FOLDER={install_path}")
         
         # Execute each build command
         for idx, build_command in enumerate(build_commands, 1):
@@ -171,7 +176,8 @@ def install_packages_from_lock(lock_file_path, package_filter=None, extra_env_va
         print("-" * 60)
         
         source_folder = pkg_info['source_folder']
-        output_folder = pkg_info['output_folder']
+        build_folder = pkg_info['build_folder']
+        install_folder = pkg_info['install_folder']
         
         # Build package-specific env vars map: all public + this package's private
         package_env_vars_map = public_env_vars_map.copy()
@@ -185,7 +191,7 @@ def install_packages_from_lock(lock_file_path, package_filter=None, extra_env_va
             if env_type == 'private' and env_name and env_value:
                 package_env_vars_map[env_name] = env_value
         
-        install_package_from_src_folder(source_folder, output_folder, package_env_vars_map)
+        install_package_from_src_folder(source_folder, build_folder, install_folder, package_env_vars_map)
 
 
 def build_all_packages(lock_file_path=None, manifest_file_path=None, package_filter=None, extra_env_vars=None):
