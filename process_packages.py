@@ -233,9 +233,9 @@ def process_packages_from_resolve(package_resolve_file_path, package_filter=None
             install_package(src_path, package_data, package_name, package_version, env)
 
 
-def process_packages_from_manifest(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False):
+def prepare_process_packages(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False):
     """
-    Process packages from manifest file for all combinations of environment variables
+    Prepare package processing by loading manifest, filtering packages, and generating build combinations
     
     Args:
         manifest_file_path: Optional path to package manifest file
@@ -243,6 +243,9 @@ def process_packages_from_manifest(manifest_file_path=None, package_filter=None,
         extra_env_vars: Optional dict of additional environment variables to set (can contain lists for multi-value)
         stage: Which stage to execute - 'build', 'install', or 'build_and_install'
         include_dependencies: If True, includes dependencies of filtered packages
+        
+    Returns:
+        dict: Preparation data containing all information needed for confirmation and processing
     """
     # Try to load from specified or default manifest file
     if not manifest_file_path:
@@ -339,6 +342,33 @@ def process_packages_from_manifest(manifest_file_path=None, package_filter=None,
     # Generate all combinations of environment variables
     env_combinations = generate_env_combinations(extra_env_vars) if extra_env_vars else [{}]
     
+    return {
+        'package_resolve_file_path': str(package_resolve_file_path),
+        'install_order': install_order,
+        'packages': packages,
+        'env_combinations': env_combinations,
+        'extra_env_vars': extra_env_vars,
+        'include_dependencies': include_dependencies,
+        'stage': stage
+    }
+
+
+def confirm_process_packages(prepare_data):
+    """
+    Display build configuration and wait for user confirmation
+    
+    Args:
+        prepare_data: Dictionary returned from prepare_process_packages
+        
+    Returns:
+        bool: True if user confirms, False otherwise
+    """
+    install_order = prepare_data['install_order']
+    packages = prepare_data['packages']
+    env_combinations = prepare_data['env_combinations']
+    extra_env_vars = prepare_data['extra_env_vars']
+    include_dependencies = prepare_data['include_dependencies']
+    
     print(f"\n{'='*60}")
     print("BUILD CONFIGURATION")
     print(f"{'='*60}")
@@ -365,6 +395,21 @@ def process_packages_from_manifest(manifest_file_path=None, package_filter=None,
     print(f"\n{'='*60}")
     input("Press Enter to start building...")
     
+    return True
+
+
+def process_packages(prepare_data):
+    """
+    Process (build/install) packages for all environment combinations
+    
+    Args:
+        prepare_data: Dictionary returned from prepare_process_packages
+    """
+    package_resolve_file_path = prepare_data['package_resolve_file_path']
+    install_order = prepare_data['install_order']
+    env_combinations = prepare_data['env_combinations']
+    stage = prepare_data['stage']
+    
     # Build packages for each combination
     for combo_idx, env_combo in enumerate(env_combinations, 1):
         print(f"\n{'#'*60}")
@@ -378,11 +423,34 @@ def process_packages_from_manifest(manifest_file_path=None, package_filter=None,
         
         # Process packages from resolve file with this environment combination
         # Pass install_order (already filtered) instead of package_filter to avoid re-filtering
-        process_packages_from_resolve(str(package_resolve_file_path), install_order, env_combo, stage, False)
+        process_packages_from_resolve(package_resolve_file_path, install_order, env_combo, stage, False)
     
     print(f"\n{'='*60}")
     print(f"✓ All {len(env_combinations)} combinations processed successfully")
     print(f"{'='*60}")
+
+
+def process_packages_from_manifest(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False):
+    """
+    Process packages from manifest file for all combinations of environment variables
+    
+    Args:
+        manifest_file_path: Optional path to package manifest file
+        package_filter: Optional list of package names to process (processes all if None)
+        extra_env_vars: Optional dict of additional environment variables to set (can contain lists for multi-value)
+        stage: Which stage to execute - 'build', 'install', or 'build_and_install'
+        include_dependencies: If True, includes dependencies of filtered packages
+    """
+    # Step 1: Prepare - Gather all information
+    prepare_data = prepare_process_packages(manifest_file_path, package_filter, extra_env_vars, stage, include_dependencies)
+    
+    # Step 2: Confirm - Display configuration and wait for user confirmation
+    if not confirm_process_packages(prepare_data):
+        print("Build cancelled by user")
+        return
+    
+    # Step 3: Process - Build all packages
+    process_packages(prepare_data)
 
 
 def parse_env_args(args):
