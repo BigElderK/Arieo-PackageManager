@@ -388,7 +388,14 @@ def confirm_process_packages(prepare_data):
     for idx, pkg_name in enumerate(install_order, 1):
         pkg_info = packages[pkg_name]
         build_index = pkg_info.get('build_index') or pkg_info.get('install_index') or idx
-        print(f"  [{build_index}] {pkg_name}")
+        
+        # Show source information
+        if pkg_info.get('git_url'):
+            source_info = f"Git URL: {pkg_info['git_url']}, Tag: {pkg_info.get('tag', 'unknown')}"
+        else:
+            source_info = f"Local: {pkg_info.get('source_folder', 'unknown')}"
+        
+        print(f"  [{build_index}] {pkg_name} ({source_info})")
     
     print(f"\nTotal builds: {len(env_combinations)} × {len(install_order)} = {len(env_combinations) * len(install_order)}")
     

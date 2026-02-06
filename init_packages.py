@@ -265,7 +265,9 @@ def load_manifest(manifest_file_path=None):
     
     try:
         with open(manifest_path, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
+            manifest = yaml.safe_load(f) or {}
+            manifest['_manifest_dir'] = str(manifest_path.parent.resolve())
+            return manifest
     except Exception as e:
         error_msg = f"✗ Error: Failed to read manifest file: {e}"
         print(error_msg)
@@ -310,8 +312,8 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
             "build_index": idx,
             "name": pkg_name,
             "description": arieo_data.get('description', ''),
-            "git_url": pkg_info['git_url'],
-            "tag": pkg_info['tag'],
+            "git_url": pkg_info.get('git_url', ''),
+            "tag": pkg_info.get('tag', ''),
             "source_folder": str(pkg_info['path'].resolve()),
             "install_folder": str((Path(packages_install_folder).resolve() / pkg_info['folder_name'])),
             "build_folder": str((Path(packages_build_folder).resolve() / pkg_info['folder_name'])),
@@ -378,10 +380,19 @@ def init_all_packages(manifest_file_path=None):
     """
     manifest = load_manifest(manifest_file_path)
     
-    packages_src_folder = manifest.get('packages_src_folder', './_packages/src')
-    packages_install_folder = manifest.get('packages_install_folder', './_packages/published')
-    packages_build_folder = manifest.get('packages_build_folder', './_build')
-    packages_resolve_file = manifest.get('packages_resolve_file', str(Path(packages_install_folder) / 'package.lock.json'))
+    manifest_dir = Path(manifest.get('_manifest_dir', '.')).resolve()
+
+    def expand_manifest_path(value):
+        if not value:
+            return value
+        expanded = value.replace('${CUR_MANIFEST_FILE_DIR}', str(manifest_dir))
+        expanded = os.path.expandvars(expanded)
+        return expanded
+
+    packages_src_folder = expand_manifest_path(manifest.get('packages_src_folder', './_packages/src'))
+    packages_install_folder = expand_manifest_path(manifest.get('packages_install_folder', './_packages/published'))
+    packages_build_folder = expand_manifest_path(manifest.get('packages_build_folder', './_build'))
+    packages_resolve_file = expand_manifest_path(manifest.get('packages_resolve_file', str(Path(packages_install_folder) / 'package.lock.json')))
     packages_dict = manifest.get('packages', {})
     
     # Count total packages across all categories
@@ -404,18 +415,35 @@ def init_all_packages(manifest_file_path=None):
             pkg_counter += 1
             print(f"\nDownloading package {pkg_counter}/{total_packages} [Category: {category}]")
             git_url = package.get('git_url')
+            local_path_raw = package.get('local')
             tag = package.get('tag', 'main')
-            
-            if not git_url:
-                error_msg = f"✗ Error: Package #{pkg_counter} missing git_url"
-                print(error_msg)
-                sys.exit(1)
-            
-            # Download package with category subfolder
-            result = download_package_from_git(git_url, tag, packages_src_folder, category)
-            repo_folder_name = result['folder_name']  # e.g., "00_build/ArieoEngine-BuildEnv-main"
-            repo_name = result['repo_name']  # e.g., "ArieoEngine-BuildEnv"
-            package_path = Path(packages_src_folder) / repo_folder_name
+
+            if local_path_raw:
+                local_path = Path(expand_manifest_path(local_path_raw))
+                if not local_path.is_absolute():
+                    local_path = (manifest_dir / local_path).resolve()
+                if not local_path.exists():
+                    error_msg = f"✗ Error: Local package path not found: {local_path}"
+                    print(error_msg)
+                    sys.exit(1)
+
+                repo_name = local_path.name
+                repo_folder_name = f"{category}/{repo_name}" if category else repo_name
+                package_path = local_path
+                git_url = None
+                tag = 'local'
+                print(f"  Using local package path: {local_path}")
+            else:
+                if not git_url:
+                    error_msg = f"✗ Error: Package #{pkg_counter} missing git_url or local"
+                    print(error_msg)
+                    sys.exit(1)
+
+                # Download package with category subfolder
+                result = download_package_from_git(git_url, tag, packages_src_folder, category)
+                repo_folder_name = result['folder_name']  # e.g., "00_build/ArieoEngine-BuildEnv-main"
+                repo_name = result['repo_name']  # e.g., "ArieoEngine-BuildEnv"
+                package_path = Path(packages_src_folder) / repo_folder_name
             
             # Read arieo_package.json
             arieo_data = read_arieo_package_json(package_path)
@@ -450,7 +478,14 @@ def init_all_packages(manifest_file_path=None):
     for idx, pkg_name in enumerate(install_order, 1):
         pkg_info = packages_data[pkg_name]
         arieo_data = pkg_info.get('arieo_package_data')
-        print(f"  {idx}. {pkg_name} (tag: {pkg_info['tag']})")
+        
+        # Show source information in parentheses
+        if pkg_info.get('git_url'):
+            source_info = f"Git URL: {pkg_info['git_url']}, Tag: {pkg_info['tag']}"
+        else:
+            source_info = f"Local: {pkg_info['path'].resolve()}"
+        
+        print(f"  {idx}. {pkg_name} ({source_info})")
         
         # Show dependencies
         if arieo_data:
