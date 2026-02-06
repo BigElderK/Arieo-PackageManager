@@ -415,9 +415,18 @@ def init_all_packages(manifest_file_path=None):
             pkg_counter += 1
             print(f"\nDownloading package {pkg_counter}/{total_packages} [Category: {category}]")
             git_url = package.get('git_url')
+            git_spec = package.get('git')
             local_path_raw = package.get('local')
             tag = package.get('tag', 'main')
-
+            
+            # Parse git@tag format if present
+            if git_spec:
+                if '@' in git_spec:
+                    git_url, tag = git_spec.rsplit('@', 1)
+                else:
+                    git_url = git_spec
+                    tag = 'main'
+            
             if local_path_raw:
                 local_path = Path(expand_manifest_path(local_path_raw))
                 if not local_path.is_absolute():
@@ -527,6 +536,4 @@ if __name__ == "__main__":
     print(f"\n{'='*60}")
     print("✓ All packages downloaded and resolve file generated")
     print(f"{'='*60}")
-    print(f"\nTo build the packages, run:")
-    print(f"  python build_packages.py")
     sys.exit(0)
