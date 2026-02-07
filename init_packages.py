@@ -315,9 +315,12 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
         # e.g., "ArieoEngine-BuildEnv" -> "ARIEO_PACKAGE_BUILDENV_INSTALL_FOLDER" and "ARIEO_PACKAGE_BUILDENV_SOURCE_FOLDER"
         base_env_var_name = 'ARIEO_PACKAGE_' + pkg_name.upper().replace('-', '_').replace('ARIEOENGINE_', '')
         
+        # Get the package name from arieo_package.json, fallback to repo name
+        package_name = arieo_data.get('name', pkg_name)
+        
         package_entry = {
             "build_index": idx,
-            "name": pkg_name,
+            "name": package_name,
             "description": arieo_data.get('description', ''),
             "git_url": pkg_info.get('git_url', ''),
             "tag": pkg_info.get('tag', ''),
@@ -354,6 +357,11 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
                     "type": "private",
                     "name": 'ARIEO_CUR_PACKAGE_INSTALL_FOLDER',
                     "value": str((Path(packages_install_folder).resolve() / pkg_info['folder_name']))
+                },
+                {
+                    "type": "private",
+                    "name": 'ARIEO_CUR_PACKAGE_NAME',
+                    "value": package_name
                 }
             ],
             "build_commands": arieo_data.get('build_commands', []),
@@ -374,8 +382,8 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
                 "tag": dep_tag
             })
         
-        resolve_data['install_order'].append(pkg_name)
-        resolve_data['packages'][pkg_name] = package_entry
+        resolve_data['install_order'].append(package_name)
+        resolve_data['packages'][package_name] = package_entry
     
     # Write resolve file
     package_resolve_file_path = Path(package_resolve_file_path)
