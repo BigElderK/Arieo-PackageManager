@@ -282,7 +282,7 @@ def process_packages_from_resolve(package_resolve_file_path, package_filter=None
             install_package(src_path, package_data, package_name, package_version, env)
 
 
-def prepare_process_packages(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False, clean=False):
+def prepare_process_packages(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False, clean=False, need_confirm=True):
     """
     Prepare package processing by loading manifest, filtering packages, and generating build combinations
     
@@ -293,6 +293,7 @@ def prepare_process_packages(manifest_file_path=None, package_filter=None, extra
         stage: Which stage to execute - 'build', 'install', or 'build_and_install'
         include_dependencies: If True, includes dependencies of filtered packages
         clean: If True, clean build/install folders before processing
+        need_confirm: If True, wait for user confirmation before building (default: True)
         
     Returns:
         dict: Preparation data containing all information needed for confirmation and processing
@@ -400,7 +401,8 @@ def prepare_process_packages(manifest_file_path=None, package_filter=None, extra
         'extra_env_vars': extra_env_vars,
         'include_dependencies': include_dependencies,
         'stage': stage,
-        'clean': clean
+        'clean': clean,
+        'need_confirm': need_confirm
     }
 
 
@@ -419,6 +421,7 @@ def confirm_process_packages(prepare_data):
     env_combinations = prepare_data['env_combinations']
     extra_env_vars = prepare_data['extra_env_vars']
     include_dependencies = prepare_data['include_dependencies']
+    need_confirm = prepare_data.get('need_confirm', True)
     
     print(f"\n{'='*60}")
     print("BUILD CONFIGURATION")
@@ -445,12 +448,18 @@ def confirm_process_packages(prepare_data):
         else:
             source_info = f"Local: {pkg_info.get('source_folder', 'unknown')}"
         
+        # Use enumerate index (idx) instead of build_index to show 1-N for filtered packages
         print(f"  [{idx}] {pkg_name} ({source_info})")
     
     print(f"\nTotal builds: {len(env_combinations)} × {len(install_order)} = {len(env_combinations) * len(install_order)}")
     
     print(f"\n{'='*60}")
-    input("Press Enter to start building...")
+    
+    # Only prompt for confirmation if need_confirm is True
+    if need_confirm:
+        input("Press Enter to start building...")
+    else:
+        print("Auto-starting build (--confirm-before-start=false)...")
     
     return True
 
@@ -488,7 +497,7 @@ def process_packages(prepare_data):
     print(f"{'='*60}")
 
 
-def process_packages_from_manifest(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False, clean=False):
+def process_packages_from_manifest(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False, clean=False, need_confirm=True):
     """
     Process packages from manifest file for all combinations of environment variables
     
@@ -499,9 +508,10 @@ def process_packages_from_manifest(manifest_file_path=None, package_filter=None,
         stage: Which stage to execute - 'build', 'install', or 'build_and_install'
         include_dependencies: If True, includes dependencies of filtered packages
         clean: If True, clean build/install folders before processing
+        need_confirm: If True, wait for user confirmation before building (default: True)
     """
     # Step 1: Prepare - Gather all information
-    prepare_data = prepare_process_packages(manifest_file_path, package_filter, extra_env_vars, stage, include_dependencies, clean)
+    prepare_data = prepare_process_packages(manifest_file_path, package_filter, extra_env_vars, stage, include_dependencies, clean, need_confirm)
     
     # Step 2: Confirm - Display configuration and wait for user confirmation
     if not confirm_process_packages(prepare_data):
@@ -674,9 +684,9 @@ Examples:
     parser.add_argument(
         '--include-dependencies',
         dest='include_dependencies',
-        default='yes',
-        choices=['yes', 'no'],
-        help='Include dependencies of filtered packages (default: yes)'
+        default='true',
+        choices=['true', 'false'],
+        help='Include dependencies of filtered packages (default: true)'
     )
     
     parser.add_argument(
@@ -685,6 +695,14 @@ Examples:
         default='false',
         choices=['true', 'false'],
         help='Clean build/install folders before processing (default: false)'
+    )
+    
+    parser.add_argument(
+        '--confirm-before-start',
+        dest='need_confirm',
+        default='true',
+        choices=['true', 'false'],
+        help='Wait for user confirmation before building (default: true)'
     )
     
     # Parse known args to handle --env{VAR}=value format
@@ -699,11 +717,14 @@ Examples:
         parser.error(f"unrecognized arguments: {' '.join(unrecognized)}")
     
     # Convert include_dependencies to boolean
-    include_deps = args.include_dependencies.lower() == 'yes'
+    include_deps = args.include_dependencies.lower() == 'true'
     
     # Convert clean to boolean
     clean = args.clean.lower() == 'true'
     
+    # Convert need_confirm to boolean
+    need_confirm = args.need_confirm.lower() == 'true'
+    
     # Process packages
-    process_packages_from_manifest(args.manifest_file, args.packages, extra_env_vars, args.stage, include_deps, clean)
+    process_packages_from_manifest(args.manifest_file, args.packages, extra_env_vars, args.stage, include_deps, clean, need_confirm)
     sys.exit(0)
