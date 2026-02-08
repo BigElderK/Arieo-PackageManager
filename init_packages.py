@@ -312,8 +312,8 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
         folder_name = pkg_info['folder_name']
         
         # Generate environment variable names from package name (without tag)
-        # e.g., "Arieo-BuildEnv" -> "ARIEO_PACKAGE_BUILDENV_INSTALL_FOLDER" and "ARIEO_PACKAGE_BUILDENV_SOURCE_FOLDER"
-        base_env_var_name = 'ARIEO_PACKAGE_' + pkg_name.upper().replace('-', '_').replace('ARIEOENGINE_', '').replace('ARIEO_', '')
+        # e.g., "Arieo-BuildEnv" -> "ARIEO_BUILDENV_PACKAGE_INSTALL_FOLDER" and "ARIEO_BUILDENV_PACKAGE_SOURCE_FOLDER"
+        pkg_var_name = pkg_name.upper().replace('-', '_').replace('ARIEOENGINE_', '').replace('ARIEO_', '')
         
         # Get the package name from arieo_package.json, fallback to repo name
         package_name = arieo_data.get('name', pkg_name)
@@ -330,37 +330,37 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
             "environment_variables": [
                 {
                     "type": "public",
-                    "name": base_env_var_name + '_INSTALL_FOLDER',
+                    "name": 'ARIEO_' + pkg_var_name + '_PACKAGE_INSTALL_FOLDER',
                     "value": str((Path(packages_install_folder).resolve() / pkg_info['folder_name']))
                 },
                 {
                     "type": "private",
-                    "name": base_env_var_name + '_SOURCE_FOLDER',
+                    "name": 'ARIEO_' + pkg_var_name + '_PACKAGE_SOURCE_FOLDER',
                     "value": str(pkg_info['path'].resolve())
                 },
                 {
                     "type": "private",
-                    "name": base_env_var_name + '_BUILD_FOLDER',
+                    "name": 'ARIEO_' + pkg_var_name + '_PACKAGE_BUILD_FOLDER',
                     "value": str((Path(packages_build_folder).resolve() / pkg_info['folder_name']))
                 },
                 {
                     "type": "private",
-                    "name": 'ARIEO_CUR_PACKAGE_SOURCE_FOLDER',
+                    "name": 'CUR_ARIEO_PACKAGE_SOURCE_FOLDER',
                     "value": str(pkg_info['path'].resolve())
                 },
                 {
                     "type": "private",
-                    "name": 'ARIEO_CUR_PACKAGE_BUILD_FOLDER',
+                    "name": 'CUR_ARIEO_PACKAGE_BUILD_FOLDER',
                     "value": str((Path(packages_build_folder).resolve() / pkg_info['folder_name']))
                 },
                 {
                     "type": "private",
-                    "name": 'ARIEO_CUR_PACKAGE_INSTALL_FOLDER',
+                    "name": 'CUR_ARIEO_PACKAGE_INSTALL_FOLDER',
                     "value": str((Path(packages_install_folder).resolve() / pkg_info['folder_name']))
                 },
                 {
                     "type": "private",
-                    "name": 'ARIEO_CUR_PACKAGE_NAME',
+                    "name": 'CUR_ARIEO_PACKAGE_NAME',
                     "value": package_name
                 }
             ],

@@ -36,9 +36,9 @@ def build_package(src_path, package_data, package_name, package_version, env):
     try:
         os.chdir(src_path)
         
-        # Set ARIEO_BUILDENV_BUILD_FOLDER from ARIEO_CUR_PACKAGE_BUILD_FOLDER if available
-        if 'ARIEO_CUR_PACKAGE_BUILD_FOLDER' in env:
-            env['ARIEO_BUILDENV_BUILD_FOLDER'] = env['ARIEO_CUR_PACKAGE_BUILD_FOLDER']
+        # Set ARIEO_BUILDENV_BUILD_FOLDER from CUR_ARIEO_PACKAGE_BUILD_FOLDER if available
+        if 'CUR_ARIEO_PACKAGE_BUILD_FOLDER' in env:
+            env['ARIEO_BUILDENV_BUILD_FOLDER'] = env['CUR_ARIEO_PACKAGE_BUILD_FOLDER']
             print(f"  Setting ARIEO_BUILDENV_BUILD_FOLDER: {env['ARIEO_BUILDENV_BUILD_FOLDER']}")
         
         print(f"\n=== Build Stage ===")
