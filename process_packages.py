@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from itertools import product
@@ -132,7 +133,7 @@ def setup_environment(src_path, build_folder, install_folder, env_vars_map):
     return env
 
 
-def process_packages_from_resolve(package_resolve_file_path, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False):
+def process_packages_from_resolve(package_resolve_file_path, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False, clean=False):
     """
     Process (build and/or install) packages based on package resolve file
     
@@ -142,6 +143,7 @@ def process_packages_from_resolve(package_resolve_file_path, package_filter=None
         extra_env_vars: Optional dict of additional environment variables to set
         stage: Which stage to execute - 'build', 'install', or 'build_and_install'
         include_dependencies: If True, includes dependencies of filtered packages
+        clean: If True, clean build/install folders before processing
     """
     try:
         with open(package_resolve_file_path, 'r', encoding='utf-8') as f:
@@ -173,19 +175,22 @@ def process_packages_from_resolve(package_resolve_file_path, package_filter=None
             print(f"  Available: {', '.join(packages.keys())}")
             sys.exit(1)
         
-        # Include dependencies if requested
+        # Include dependencies if requested for both cleaning and building
         if include_dependencies:
-            packages_to_build = gather_dependencies(package_filter, packages)
-            deps_only = sorted(packages_to_build - set(package_filter))
+            packages_to_process = gather_dependencies(package_filter, packages)
+            deps_only = sorted(packages_to_process - set(package_filter))
             if deps_only:
                 print(f"Including dependencies: {', '.join(deps_only)}")
         else:
-            packages_to_build = set(package_filter)
+            packages_to_process = set(package_filter)
         
-        install_order = [pkg for pkg in install_order if pkg in packages_to_build]
+        install_order = [pkg for pkg in install_order if pkg in packages_to_process]
     
     # Sort packages by build_index to ensure correct build order
     install_order.sort(key=lambda pkg_name: packages[pkg_name].get('build_index', 999))
+    
+    # For cleaning, use the same filtered list as building
+    clean_order = install_order
     
     # Gather all public environment variables from all packages
     # Start with root-level environment variables
@@ -202,6 +207,41 @@ def process_packages_from_resolve(package_resolve_file_path, package_filter=None
     # Add extra environment variables from command line (treated as public)
     if extra_env_vars:
         public_env_vars_map.update(extra_env_vars)
+    
+    # Clean phase: Clean all packages (including dependencies) first if requested
+    if clean:
+        print("\n" + "=" * 60)
+        print("CLEANING PHASE")
+        print("=" * 60)
+        
+        for idx, pkg_name in enumerate(clean_order, 1):
+            if pkg_name not in packages:
+                continue
+            
+            pkg_info = packages[pkg_name]
+            build_folder = pkg_info['build_folder']
+            install_folder = pkg_info['install_folder']
+            
+            print(f"\n[{idx}/{len(clean_order)}] Cleaning {pkg_name}")
+            
+            # Clean build folder if needed for build stage
+            if (stage == 'build' or stage == 'build_and_install') and build_folder:
+                build_path = Path(build_folder)
+                if build_path.exists():
+                    print(f"  Cleaning build folder: {build_path}")
+                    shutil.rmtree(build_path, ignore_errors=True)
+            
+            # Clean install folder if needed for install stage
+            if (stage == 'install' or stage == 'build_and_install') and install_folder:
+                install_path = Path(install_folder)
+                if install_path.exists():
+                    print(f"  Cleaning install folder: {install_path}")
+                    shutil.rmtree(install_path, ignore_errors=True)
+    
+    # Build/Install phase: Process all packages
+    print("\n" + "=" * 60)
+    print("BUILD/INSTALL PHASE")
+    print("=" * 60)
     
     for idx, pkg_name in enumerate(install_order, 1):
         if pkg_name not in packages:
@@ -235,16 +275,14 @@ def process_packages_from_resolve(package_resolve_file_path, package_filter=None
         env = setup_environment(src_path, build_folder, install_folder, package_env_vars_map)
         
         # Execute build and/or install based on stage
-        if stage == 'build':
+        if stage == 'build' or stage == 'build_and_install':
             build_package(src_path, package_data, package_name, package_version, env)
-        elif stage == 'install':
-            install_package(src_path, package_data, package_name, package_version, env)
-        else:  # stage == 'build_and_install'
-            build_package(src_path, package_data, package_name, package_version, env)
+        
+        if stage == 'install' or stage == 'build_and_install':
             install_package(src_path, package_data, package_name, package_version, env)
 
 
-def prepare_process_packages(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False):
+def prepare_process_packages(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False, clean=False):
     """
     Prepare package processing by loading manifest, filtering packages, and generating build combinations
     
@@ -254,6 +292,7 @@ def prepare_process_packages(manifest_file_path=None, package_filter=None, extra
         extra_env_vars: Optional dict of additional environment variables to set (can contain lists for multi-value)
         stage: Which stage to execute - 'build', 'install', or 'build_and_install'
         include_dependencies: If True, includes dependencies of filtered packages
+        clean: If True, clean build/install folders before processing
         
     Returns:
         dict: Preparation data containing all information needed for confirmation and processing
@@ -360,7 +399,8 @@ def prepare_process_packages(manifest_file_path=None, package_filter=None, extra
         'env_combinations': env_combinations,
         'extra_env_vars': extra_env_vars,
         'include_dependencies': include_dependencies,
-        'stage': stage
+        'stage': stage,
+        'clean': clean
     }
 
 
@@ -426,6 +466,7 @@ def process_packages(prepare_data):
     install_order = prepare_data['install_order']
     env_combinations = prepare_data['env_combinations']
     stage = prepare_data['stage']
+    clean = prepare_data.get('clean', False)
     
     # Build packages for each combination
     for combo_idx, env_combo in enumerate(env_combinations, 1):
@@ -440,14 +481,14 @@ def process_packages(prepare_data):
         
         # Process packages from resolve file with this environment combination
         # Pass install_order (already filtered) instead of package_filter to avoid re-filtering
-        process_packages_from_resolve(package_resolve_file_path, install_order, env_combo, stage, False)
+        process_packages_from_resolve(package_resolve_file_path, install_order, env_combo, stage, False, clean)
     
     print(f"\n{'='*60}")
     print(f"✓ All {len(env_combinations)} combinations processed successfully")
     print(f"{'='*60}")
 
 
-def process_packages_from_manifest(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False):
+def process_packages_from_manifest(manifest_file_path=None, package_filter=None, extra_env_vars=None, stage='build_and_install', include_dependencies=False, clean=False):
     """
     Process packages from manifest file for all combinations of environment variables
     
@@ -457,9 +498,10 @@ def process_packages_from_manifest(manifest_file_path=None, package_filter=None,
         extra_env_vars: Optional dict of additional environment variables to set (can contain lists for multi-value)
         stage: Which stage to execute - 'build', 'install', or 'build_and_install'
         include_dependencies: If True, includes dependencies of filtered packages
+        clean: If True, clean build/install folders before processing
     """
     # Step 1: Prepare - Gather all information
-    prepare_data = prepare_process_packages(manifest_file_path, package_filter, extra_env_vars, stage, include_dependencies)
+    prepare_data = prepare_process_packages(manifest_file_path, package_filter, extra_env_vars, stage, include_dependencies, clean)
     
     # Step 2: Confirm - Display configuration and wait for user confirmation
     if not confirm_process_packages(prepare_data):
@@ -637,6 +679,14 @@ Examples:
         help='Include dependencies of filtered packages (default: yes)'
     )
     
+    parser.add_argument(
+        '--clean',
+        dest='clean',
+        default='false',
+        choices=['true', 'false'],
+        help='Clean build/install folders before processing (default: false)'
+    )
+    
     # Parse known args to handle --env{VAR}=value format
     args, unknown = parser.parse_known_args()
     
@@ -651,6 +701,9 @@ Examples:
     # Convert include_dependencies to boolean
     include_deps = args.include_dependencies.lower() == 'yes'
     
+    # Convert clean to boolean
+    clean = args.clean.lower() == 'true'
+    
     # Process packages
-    process_packages_from_manifest(args.manifest_file, args.packages, extra_env_vars, args.stage, include_deps)
+    process_packages_from_manifest(args.manifest_file, args.packages, extra_env_vars, args.stage, include_deps, clean)
     sys.exit(0)
