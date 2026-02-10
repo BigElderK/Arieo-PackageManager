@@ -96,26 +96,29 @@ def build_packages(cmake_file, build_folder, presets, build_types, packages, pac
                 print(f"Exit code: {e.returncode}")
                 sys.exit(1)
             
-            # Build each package
+            # Build all packages in a single command with parallel jobs
+            print(f"\n{'-'*80}")
+            print(f"Building packages: {', '.join(packages)}")
+            print(f"{'-'*80}\n")
+            
+            build_cmd = [
+                "cmake",
+                "--build", str(build_dir),
+                "--config", build_type,
+                "-j", "8"
+            ]
+            
+            # Add all package targets
             for package in packages:
-                print(f"\n{'-'*80}")
-                print(f"Building package: {package}")
-                print(f"{'-'*80}\n")
-                
-                build_cmd = [
-                    "cmake",
-                    "--build", str(build_dir),
-                    "--config", build_type,
-                    "--target", package
-                ]
-                
-                try:
-                    run_command(build_cmd, cwd=source_dir)
-                    print(f"\n✓ Successfully built {package} ({preset}/{build_type})")
-                except subprocess.CalledProcessError as e:
-                    print(f"\nError: Build failed for {package} ({preset}/{build_type})")
-                    print(f"Exit code: {e.returncode}")
-                    sys.exit(1)
+                build_cmd.extend(["--target", package])
+            
+            try:
+                run_command(build_cmd, cwd=source_dir)
+                print(f"\n✓ Successfully built all packages ({preset}/{build_type})")
+            except subprocess.CalledProcessError as e:
+                print(f"\nError: Build failed for packages ({preset}/{build_type})")
+                print(f"Exit code: {e.returncode}")
+                sys.exit(1)
     
     print(f"\n{'='*80}")
     print(f"✓ All packages built successfully!")
