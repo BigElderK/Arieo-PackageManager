@@ -169,7 +169,7 @@ def generate_cmake_file(output_path, package_resolve_file_path, package_filter=N
             if build_folder:
                 abs_build = Path(build_folder).resolve().as_posix()
                 f.write(f"    # Build directory\n")
-                f.write(f"    BINARY_DIR \"{abs_build}\"\n")
+                f.write(f"    BINARY_DIR \"{abs_build}/${{CMAKE_CONFIGURE_PRESET}}/${{CMAKE_BUILD_TYPE}}\"\n")
             
             # Install directory (use actual path from resolve file)
             install_folder = pkg_info.get('install_folder')
@@ -191,6 +191,8 @@ def generate_cmake_file(output_path, package_resolve_file_path, package_filter=N
             f.write(f"    # Update options\n")
             f.write(f"    UPDATE_COMMAND \"\"\n")
             f.write(f"    \n")
+            f.write(f"    BUILD_ALWAYS TRUE\n")
+            f.write(f"    \n")
             
             # Package-specific environment variables
             package_env_vars = {}
@@ -208,43 +210,84 @@ def generate_cmake_file(output_path, package_resolve_file_path, package_filter=N
                             pass  # If conversion fails, use original value
                     package_env_vars[env_name] = env_value
             
+            # Gather public environment variables from all dependency packages recursively
+            dep_public_env_vars = {}
+            
+            def gather_dep_env_vars(dep_pkg_name, visited=None):
+                if visited is None:
+                    visited = set()
+                if dep_pkg_name in visited:
+                    return
+                visited.add(dep_pkg_name)
+                
+                if dep_pkg_name not in packages:
+                    return
+                
+                dep_pkg_info = packages[dep_pkg_name]
+                dep_env_vars = dep_pkg_info.get('environment_variables', [])
+                
+                # Add only public environment variables
+                for env_var in dep_env_vars:
+                    env_type = env_var.get('type', 'public')
+                    if env_type == 'public':
+                        env_name = env_var.get('name')
+                        env_value = env_var.get('value')
+                        if env_name and env_value:
+                            # Convert paths to use forward slashes
+                            if isinstance(env_value, str) and ('\\' in env_value or ':' in env_value):
+                                try:
+                                    env_value = Path(env_value).as_posix()
+                                except:
+                                    pass
+                            dep_public_env_vars[env_name] = env_value
+                
+                # Recursively gather from dependencies of this dependency
+                dep_deps = dependency_map.get(dep_pkg_name, [])
+                for nested_dep in dep_deps:
+                    gather_dep_env_vars(nested_dep, visited)
+            
+            # Gather from all direct dependencies
+            for dep_pkg in deps:
+                gather_dep_env_vars(dep_pkg)
+            
             # Check if package has arieo_package.json to determine build system
             source_path = Path(source_folder) if source_folder else None
             has_arieo_package = source_path and (source_path / "arieo_package.json").exists()
             
             if has_arieo_package:
-                # Custom build using arieo_package.json scripts
-                f.write(f"    # Custom build using arieo_package.json\n")
+                # Custom build using arieo_package.json and CMakeLists.txt in source
+                # Use CMAKE_ARGS to pass environment variables
+                f.write(f"    CMAKE_ARGS\n")
+                f.write(f"        -DCMAKE_BUILD_TYPE=${{CMAKE_BUILD_TYPE}}\n")
+                f.write(f"        -DCMAKE_INSTALL_PREFIX={abs_install}\n")
+                f.write(f"        -DCMAKE_CONFIGURE_PRESET=${{CMAKE_CONFIGURE_PRESET}}\n")
                 
-                # Set environment variables for build scripts
-                env_vars_for_cmake = []
-                env_vars_for_cmake.append(f"SOURCE_FOLDER=<SOURCE_DIR>")
-                env_vars_for_cmake.append(f"BUILD_FOLDER=<BINARY_DIR>")
-                env_vars_for_cmake.append(f"INSTALL_FOLDER=<INSTALL_DIR>")
+                # Add root environment variables
+                for env_name in root_env_vars.keys():
+                    f.write(f"        -D{env_name}=${{{env_name}}}\n")
                 
-                for env_name, env_value in package_env_vars.items():
-                    env_vars_for_cmake.append(f"{env_name}={env_value}")
+                # Add public environment variables from dependency packages
+                for env_name, env_value in dep_public_env_vars.items():
+                    f.write(f"        -D{env_name}={env_value}\n")
                 
-                # Use Python script to execute build/install commands
-                f.write(f"    CONFIGURE_COMMAND \"\"\n")
-                f.write(f"    BUILD_COMMAND python \"${{CMAKE_CURRENT_SOURCE_DIR}}/package_manager/package/build_package.py\" --source=<SOURCE_DIR> --build=<BINARY_DIR> --install=<INSTALL_DIR>")
+                # Add package-specific environment variables as CMake definitions
                 for env_name, env_value in package_env_vars.items():
-                    f.write(f" --env={env_name}={env_value}")
-                f.write(f"\n")
-                f.write(f"    INSTALL_COMMAND python \"${{CMAKE_CURRENT_SOURCE_DIR}}/package_manager/package/install_package.py\" --source=<SOURCE_DIR> --build=<BINARY_DIR> --install=<INSTALL_DIR>")
-                for env_name, env_value in package_env_vars.items():
-                    f.write(f" --env={env_name}={env_value}")
-                f.write(f"\n")
+                    f.write(f"        -D{env_name}={env_value}\n")
             else:
                 # Standard CMake build
                 f.write(f"    # Standard CMake build\n")
                 f.write(f"    CMAKE_ARGS\n")
                 f.write(f"        -DCMAKE_BUILD_TYPE=${{CMAKE_BUILD_TYPE}}\n")
                 f.write(f"        -DCMAKE_INSTALL_PREFIX={abs_install}\n")
+                f.write(f"        -DCMAKE_CONFIGURE_PRESET=${{CMAKE_CONFIGURE_PRESET}}\n")
                 
                 # Add root environment variables
                 for env_name in root_env_vars.keys():
                     f.write(f"        -D{env_name}=${{{env_name}}}\n")
+                
+                # Add public environment variables from dependency packages
+                for env_name, env_value in dep_public_env_vars.items():
+                    f.write(f"        -D{env_name}={env_value}\n")
                 
                 # Add package-specific environment variables as CMake definitions
                 for env_name, env_value in package_env_vars.items():
