@@ -358,11 +358,27 @@ def generate_cmake_file(output_path, package_resolve_file_path, package_filter=N
             env_mod_vars.update(root_public_env_vars)
             env_mod_vars.update(dep_public_env_vars)
             
+            # Add CMAKE_PREFIX_PATH from all dependency packages' install folders as environment variable
+            # This allows child projects to append to CMAKE_PREFIX_PATH without overriding preset values
+            # Store paths separately to use cmake_list_append operation
+            prefix_path_entries = []
+            if deps:
+                for dep_pkg in deps:
+                    if dep_pkg in packages:
+                        # Generate variable name from package name
+                        dep_var_name = dep_pkg.upper().replace('-', '_').replace('ARIEOENGINE_', '').replace('ARIEO_', '')
+                        install_var_name = f'ARIEO_{dep_var_name}_PACKAGE_INSTALL_FOLDER'
+                        prefix_path_entries.append(f'${{{install_var_name}}}')
+            
             # Only add CONFIGURE_ENVIRONMENT_MODIFICATION if there are variables to set
-            if env_mod_vars:
+            if env_mod_vars or prefix_path_entries:
                 f.write(f"\n    CONFIGURE_ENVIRONMENT_MODIFICATION\n")
+                # First, set all regular environment variables
                 for env_name in sorted(env_mod_vars.keys()):
                     f.write(f"        {env_name}=set:${{{env_name}}}\n")
+                # Then, append each dependency path to CMAKE_EXTRA_PREFIX_PATH using cmake_list_append
+                for prefix_path in prefix_path_entries:
+                    f.write(f"        ARIEO_CMAKE_EXTRA_PREFIX_PATH=cmake_list_append:{prefix_path}\n")
             
             # Add PATCH_COMMAND to copy cmake_presets_file if present
             if cmake_presets_file:
