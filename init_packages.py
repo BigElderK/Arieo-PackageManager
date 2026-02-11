@@ -739,7 +739,7 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
         folder_name = pkg_info['folder_name']
         
         # Generate environment variable names from package name (without tag)
-        # e.g., "Arieo-BuildEnv" -> "ARIEO_BUILDENV_PACKAGE_INSTALL_FOLDER" and "ARIEO_BUILDENV_PACKAGE_SOURCE_FOLDER"
+        # e.g., "Arieo-BuildEnv" -> "ARIEO_BUILDENV_PACKAGE_INSTALL_FOLDER"
         pkg_var_name = pkg_name.upper().replace('-', '_').replace('ARIEOENGINE_', '').replace('ARIEO_', '')
         
         # Get the package name from arieo_package.json, fallback to repo name
@@ -772,32 +772,7 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
                 },
                 {
                     "type": "private",
-                    "name": 'ARIEO_' + pkg_var_name + '_PACKAGE_SOURCE_FOLDER',
-                    "value": str(pkg_info['path'].resolve())
-                },
-                {
-                    "type": "private",
-                    "name": 'ARIEO_' + pkg_var_name + '_PACKAGE_BUILD_FOLDER',
-                    "value": str((Path(packages_build_folder).resolve() / pkg_info['folder_name']))
-                },
-                {
-                    "type": "private",
-                    "name": 'CUR_ARIEO_PACKAGE_SOURCE_FOLDER',
-                    "value": str(pkg_info['path'].resolve())
-                },
-                {
-                    "type": "private",
-                    "name": 'CUR_ARIEO_PACKAGE_BUILD_FOLDER',
-                    "value": str((Path(packages_build_folder).resolve() / pkg_info['folder_name']))
-                },
-                {
-                    "type": "private",
-                    "name": 'CUR_ARIEO_PACKAGE_INSTALL_FOLDER',
-                    "value": install_folder_path
-                },
-                {
-                    "type": "private",
-                    "name": 'CUR_ARIEO_PACKAGE_NAME',
+                    "name": 'CUR_PROCESSING_ARIEO_PACKAGE_NAME',
                     "value": package_name
                 }
             ],
