@@ -325,6 +325,11 @@ def generate_cmake_file(output_path, package_resolve_file_path, package_filter=N
             f.write(f"    \n")
             f.write(f"    BUILD_ALWAYS TRUE\n")
             f.write(f"    \n")
+            # Use terminal for build/install/configure to stream output in real-time
+            f.write(f"    USES_TERMINAL_CONFIGURE TRUE\n")
+            f.write(f"    USES_TERMINAL_BUILD TRUE\n")
+            f.write(f"    USES_TERMINAL_INSTALL TRUE\n")
+            f.write(f"    \n")
             
             # Collect environment variables for CMAKE_CACHE_ARGS
             # Only include private variables since public ones are set via CONFIGURE_ENVIRONMENT_MODIFICATION
