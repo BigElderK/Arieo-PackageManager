@@ -8,6 +8,7 @@ import json
 import subprocess
 import sys
 import yaml
+import platform
 from pathlib import Path
 
 
@@ -226,11 +227,26 @@ Example usage:
     
     # Default to Release if no build types specified
     build_types = args.build_types if args.build_types else ["Release"]
+
+    # Filter presets based on host platform
+    host = platform.system()
+    filtered_presets = []
+    for preset in args.presets:
+        if preset.startswith("windows.") and host != "Windows":
+            print(f"Skipping preset '{preset}': only supported on Windows host platform.")
+            continue
+        if preset.startswith("macos.") and host != "Darwin":
+            print(f"Skipping preset '{preset}': only supported on macOS host platform.")
+            continue
+        filtered_presets.append(preset)
+    if not filtered_presets:
+        print("No supported presets for current host platform. Nothing to build.")
+        sys.exit(0)
     
     build_packages(
         cmake_file=cmake_file,
         build_folder=build_folder,
-        presets=args.presets,
+        presets=filtered_presets,
         build_types=build_types,
         packages=args.packages,
         packages_info=packages_info
