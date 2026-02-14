@@ -5,6 +5,7 @@ Build packages using CMake ExternalProject_Add system
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import yaml
@@ -42,7 +43,53 @@ def run_command(cmd, cwd=None, env=None, check=True):
     return result
 
 
-def build_packages(cmake_file, build_folder, presets, build_types, packages, packages_info):
+def parse_env_vars(envs=None, env_file=None, clear_env=False):
+    """
+    Parse environment variables from arguments and file
+    
+    Args:
+        envs: List of "KEY=VALUE" strings
+        env_file: Path to environment file
+        clear_env: If True, start with empty env; otherwise inherit os.environ
+    
+    Returns:
+        dict: Environment variables to use, or None if no modifications
+    """
+    # If no env options specified, return None to use default environment
+    if not envs and not env_file and not clear_env:
+        return None
+    
+    # Start with current environment or empty dict
+    env = {} if clear_env else os.environ.copy()
+    
+    # Load from file if specified
+    if env_file:
+        env_path = Path(env_file)
+        if env_path.exists():
+            print(f"Loading environment variables from: {env_path}")
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, _, value = line.partition('=')
+                        env[key.strip()] = value.strip()
+        else:
+            print(f"Warning: Environment file not found: {env_path}")
+    
+    # Override with command-line args
+    if envs:
+        for env_str in envs:
+            if '=' in env_str:
+                key, _, value = env_str.partition('=')
+                env[key] = value
+                print(f"Setting environment variable: {key}={value}")
+            else:
+                print(f"Warning: Invalid env format (expected KEY=VALUE): {env_str}")
+    
+    return env
+
+
+def build_packages(cmake_file, build_folder, presets, build_types, packages, packages_info, env=None):
     """
     Build specified packages with given presets and build types
     
@@ -53,6 +100,7 @@ def build_packages(cmake_file, build_folder, presets, build_types, packages, pac
         build_types: List of build types (e.g., ["Debug", "Release"])
         packages: List of package names to build (e.g., ["Arieo-Core"])
         packages_info: Dict containing package information from packages_resolve.json
+        env: Environment variables dict to use for subprocess calls
     """
     cmake_file = Path(cmake_file).resolve()
     source_dir = cmake_file.parent
@@ -91,7 +139,7 @@ def build_packages(cmake_file, build_folder, presets, build_types, packages, pac
             ]
             
             try:
-                run_command(configure_cmd, cwd=source_dir)
+                run_command(configure_cmd, cwd=source_dir, env=env)
             except subprocess.CalledProcessError as e:
                 print(f"\nError: CMake configuration failed for {preset}/{build_type}")
                 print(f"Exit code: {e.returncode}")
@@ -114,7 +162,7 @@ def build_packages(cmake_file, build_folder, presets, build_types, packages, pac
                 build_cmd.extend(["--target", package])
             
             try:
-                run_command(build_cmd, cwd=source_dir)
+                run_command(build_cmd, cwd=source_dir, env=env)
                 print(f"\n✓ Successfully built all packages ({preset}/{build_type})")
             except subprocess.CalledProcessError as e:
                 print(f"\nError: Build failed for packages ({preset}/{build_type})")
@@ -141,6 +189,21 @@ Example usage:
     --build_type=Release \\
     --package=Arieo-Core \\
     --package=Arieo-Interface-Main
+
+  # With environment variables:
+  python build_packages.py \\
+    --manifest=packages.manifest.yaml \\
+    --preset=android.armv8 \\
+    --env=ANDROID_NDK_HOME=/path/to/ndk \\
+    --env=JAVA_HOME=/path/to/jdk \\
+    --package=Arieo-ThirdParties
+
+  # Using an environment file:
+  python build_packages.py \\
+    --manifest=packages.manifest.yaml \\
+    --preset=windows.x86_64 \\
+    --env-file=build_env.txt \\
+    --package=Arieo-Core
         """
     )
     
@@ -172,6 +235,27 @@ Example usage:
         dest="packages",
         required=True,
         help="Package name to build (can be specified multiple times)"
+    )
+    
+    parser.add_argument(
+        "--env",
+        action="append",
+        dest="envs",
+        metavar="KEY=VALUE",
+        help="Set environment variable for build process (can be specified multiple times)"
+    )
+    
+    parser.add_argument(
+        "--env-file",
+        dest="env_file",
+        help="Path to file containing environment variables (KEY=VALUE per line, # for comments)"
+    )
+    
+    parser.add_argument(
+        "--env-clear",
+        action="store_true",
+        dest="env_clear",
+        help="Clear inherited environment variables (use only explicitly set vars)"
     )
     
     args = parser.parse_args()
@@ -243,13 +327,21 @@ Example usage:
         print("No supported presets for current host platform. Nothing to build.")
         sys.exit(0)
     
+    # Parse environment variables
+    env = parse_env_vars(
+        envs=args.envs,
+        env_file=args.env_file,
+        clear_env=args.env_clear
+    )
+    
     build_packages(
         cmake_file=cmake_file,
         build_folder=build_folder,
         presets=filtered_presets,
         build_types=build_types,
         packages=args.packages,
-        packages_info=packages_info
+        packages_info=packages_info,
+        env=env
     )
 
 
