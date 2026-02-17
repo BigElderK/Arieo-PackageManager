@@ -760,7 +760,8 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
             sys.exit(1)
         
         build_folder_path = build_folder_yaml
-        build_folder_path = build_folder_path.replace('${ARIEO_PACKAGE_INSTALL_FOLDER}', Path(packages_build_folder).resolve().as_posix())
+        build_folder_path = build_folder_path.replace('${ARIEO_PACKAGE_INSTALL_FOLDER}', Path(packages_install_folder).resolve().as_posix())
+        build_folder_path = build_folder_path.replace('${ARIEO_PACKAGE_BUILD_FOLDER}', Path(packages_build_folder).resolve().as_posix())
         build_folder_path = build_folder_path.replace('${ARIEO_PACKAGE_CATEGORY}', category)
         build_folder_path = build_folder_path.replace('${ARIEO_PACKAGE_NAME}', package_name)
         
@@ -773,6 +774,7 @@ def generate_package_resolve_file(install_order, packages_data, packages_src_fol
         
         install_folder_path = install_folder_yaml
         install_folder_path = install_folder_path.replace('${ARIEO_PACKAGE_INSTALL_FOLDER}', Path(packages_install_folder).resolve().as_posix())
+        install_folder_path = install_folder_path.replace('${ARIEO_PACKAGE_BUILD_FOLDER}', Path(packages_build_folder).resolve().as_posix())
         install_folder_path = install_folder_path.replace('${ARIEO_PACKAGE_CATEGORY}', category)
         install_folder_path = install_folder_path.replace('${ARIEO_PACKAGE_NAME}', package_name)
         
