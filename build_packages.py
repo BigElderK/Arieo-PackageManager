@@ -13,6 +13,54 @@ import platform
 from pathlib import Path
 
 
+def resolve_package_dependencies(packages, packages_info, install_order):
+    """
+    Resolve all dependencies for the given packages recursively.
+    
+    Args:
+        packages: List of package names to resolve dependencies for
+        packages_info: Dict containing package information from packages_resolve.json
+        install_order: List of package names in topological order from packages_resolve.json
+    
+    Returns:
+        list: Ordered list of packages including all dependencies
+    """
+    resolved = set()
+    
+    def collect_deps(package_name):
+        if package_name in resolved:
+            return
+        
+        # Get package info
+        pkg_info = packages_info.get(package_name)
+        if not pkg_info:
+            print(f"Warning: Package '{package_name}' not found in packages_resolve.json")
+            resolved.add(package_name)
+            return
+        
+        # Recursively collect dependencies first
+        deps = pkg_info.get('dependencies', [])
+        for dep in deps:
+            dep_name = dep.get('name') if isinstance(dep, dict) else dep
+            if dep_name:
+                collect_deps(dep_name)
+        
+        resolved.add(package_name)
+    
+    # Collect all dependencies
+    for package in packages:
+        collect_deps(package)
+    
+    # Order by install_order (topological sort)
+    if install_order:
+        order_map = {name: idx for idx, name in enumerate(install_order)}
+        ordered = sorted(resolved, key=lambda p: order_map.get(p, float('inf')))
+    else:
+        ordered = list(resolved)
+    
+    return ordered
+
+
 def cleanup_empty_dirs(root_path):
     """
     Recursively remove empty directories from root_path.
@@ -117,7 +165,7 @@ def parse_env_vars(envs=None, env_file=None, clear_env=False):
     return env
 
 
-def build_packages(cmake_file, build_folder, presets, build_types, packages, packages_info, packages_install_folder, env=None):
+def build_packages(cmake_file, build_folder, presets, build_types, packages, packages_info, packages_install_folder, install_order, no_dependencies=False, env=None):
     """
     Build specified packages with given presets and build types
     
@@ -129,6 +177,8 @@ def build_packages(cmake_file, build_folder, presets, build_types, packages, pac
         packages: List of package names to build (e.g., ["Arieo-Core"])
         packages_info: Dict containing package information from packages_resolve.json
         packages_install_folder: Install folder path for package outputs
+        install_order: List of package names in topological order
+        no_dependencies: If True, skip building dependencies of specified packages
         env: Environment variables dict to use for subprocess calls
     """
     cmake_file = Path(cmake_file).resolve()
@@ -139,6 +189,14 @@ def build_packages(cmake_file, build_folder, presets, build_types, packages, pac
         print(f"Error: CMakeLists.txt not found: {cmake_file}")
         sys.exit(1)
     
+    # Resolve dependencies if requested
+    if not no_dependencies:
+        original_packages = packages.copy()
+        packages = resolve_package_dependencies(packages, packages_info, install_order)
+        added_deps = set(packages) - set(original_packages)
+        if added_deps:
+            print(f"\nResolved dependencies: {', '.join(sorted(added_deps))}")
+    
     print(f"\n{'='*80}")
     print(f"Building Packages")
     print(f"{'='*80}")
@@ -146,6 +204,7 @@ def build_packages(cmake_file, build_folder, presets, build_types, packages, pac
     print(f"Presets: {', '.join(presets)}")
     print(f"Build types: {', '.join(build_types)}")
     print(f"Packages: {', '.join(packages)}")
+    print(f"No dependencies: {no_dependencies}")
     print(f"{'='*80}\n")
     
     # Build for each combination of preset and build type
@@ -226,6 +285,13 @@ Example usage:
     --package=Arieo-Core \\
     --package=Arieo-Interface-Main
 
+  # Build without dependencies:
+  python build_packages.py \\
+    --manifest=packages.manifest.yaml \\
+    --preset=windows.x86_64 \\
+    --no-dependencies=true \\
+    --package=Arieo-Core
+
   # With environment variables:
   python build_packages.py \\
     --manifest=packages.manifest.yaml \\
@@ -294,7 +360,19 @@ Example usage:
         help="Clear inherited environment variables (use only explicitly set vars)"
     )
     
+    parser.add_argument(
+        "--no-dependencies",
+        type=lambda x: x.lower() in ('true', '1', 'yes'),
+        default=False,
+        metavar="true|false",
+        help="Skip building dependencies of specified packages (default: false)"
+    )
+    
     args = parser.parse_args()
+    
+    # Debug: print parsed no_dependencies value
+    import sys as _sys
+    print(f"DEBUG: args.no_dependencies = {args.no_dependencies} (type: {type(args.no_dependencies).__name__})", file=_sys.stderr, flush=True)
     
     # Read manifest file
     manifest_path = Path(args.manifest).resolve()
@@ -335,12 +413,14 @@ Example usage:
     # Load packages_resolve.json to get package information
     packages_info = {}
     packages_install_folder = None
+    install_order = []
     if packages_resolve_file.exists():
         try:
             with open(packages_resolve_file, 'r') as f:
                 resolve_data = json.load(f)
                 packages_info = resolve_data.get('packages', {})
                 packages_install_folder = resolve_data.get('packages_install_folder')
+                install_order = resolve_data.get('install_order', [])
                 print(f"Loaded {len(packages_info)} packages from resolve file")
         except Exception as e:
             print(f"Warning: Failed to read packages resolve file: {e}")
@@ -380,6 +460,8 @@ Example usage:
         packages=args.packages,
         packages_info=packages_info,
         packages_install_folder=packages_install_folder,
+        install_order=install_order,
+        no_dependencies=args.no_dependencies,
         env=env
     )
 
