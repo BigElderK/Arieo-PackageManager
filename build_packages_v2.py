@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--build_type", action="append", default=[], help="Build type (can be specified multiple times)")
     parser.add_argument("--package", action="append", default=[], help="Package to build (can be specified multiple times)")
     parser.add_argument("--env", action="append", default=[], help="Environment variable to set (format: VAR=VALUE)")
+    parser.add_argument("--stage", default="BUILD_ENGINE_STAGE", help="Build stage (default: BUILD_ENGINE_STAGE)")
 
     args = parser.parse_args()
 
@@ -23,6 +24,7 @@ def main():
     presets = args.preset if args.preset else ["default"]
     build_types = args.build_type if args.build_type else ["Release"]
     packages = args.package
+    stage = args.stage
 
     packages_str = ";".join(packages) if packages else ""
 
@@ -46,7 +48,7 @@ def main():
             build_dir = base_build_dir / f"{preset}" / f"{build_type}"
             build_dir.mkdir(parents=True, exist_ok=True)
 
-            print(f"\n=== Configuring: preset={preset}, build_type={build_type}, packages={packages_str} ===")
+            print(f"\n=== Configuring: preset={preset}, build_type={build_type}, packages={packages_str}, stage={stage} ===")
 
             configure_cmd = [
                 "cmake",
@@ -55,11 +57,13 @@ def main():
                 "-B", str(build_dir)
             ]
 
-            # If preset is target from devenv, pass as -DCMAKE_CONFIGURE_PRESET, otherwise use --preset=xxx
-            if preset.startswith("devenv."):
-                preset = preset[len("devenv."):]
+            configure_cmd += [
+                f"-DARIEO_BUILD_CONFIGURE_PRESET={preset}",
+                f"-DARIEO_BUILD_CONFIGURE_STAGE={stage}",
+            ]
+
+            if stage == "INSTALL_BUILD_ENV_STAGE":
                 configure_cmd += [
-                    f"-DCMAKE_CONFIGURE_PRESET={preset}",
                 ]
             else:
                 configure_cmd += [
@@ -69,10 +73,10 @@ def main():
 
             result = subprocess.run(configure_cmd, env=env)
             if result.returncode != 0:
-                print(f"Configure failed for preset={preset}, build_type={build_type}")
+                print(f"Configure failed for preset={preset}, build_type={build_type}, stage={stage}")
                 return result.returncode
 
-            print(f"\n=== Building: preset={preset}, build_type={build_type}, packages={packages_str} ===")
+            print(f"\n=== Building: preset={preset}, build_type={build_type}, packages={packages_str}, stage={stage} ===")
 
             # Build
             build_cmd = [
@@ -86,7 +90,7 @@ def main():
 
             result = subprocess.run(build_cmd, env=env)
             if result.returncode != 0:
-                print(f"Build failed for preset={preset}, build_type={build_type}")
+                print(f"Build failed for preset={preset}, build_type={build_type}, stage={stage}")
                 return result.returncode
 
     print("\n=== All builds completed successfully ===")
