@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 4.2.3)
 include(${CMAKE_CURRENT_LIST_DIR}/package/arieo_remote_package.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/package/arieo_local_package.cmake)
 
-function(arieo_workspace)
+function(ARIEO_WORKSPACE)
     set(oneValueArgs
     )
     set(multiValueArgs 
@@ -37,6 +37,10 @@ function(arieo_workspace)
         "${multiValueArgs}"
         ${ARGN}
     )
+
+    if (NOT DEFINED ENV{ARIEO_WORKSPACE_ROOT_DIR})
+        message(FATAL_ERROR "Environment variable ARIEO_WORKSPACE_ROOT_DIR is not defined.")
+    endif()
 
     project(ArieoWorkspace)
 

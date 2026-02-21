@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--preset", action="append", default=[], help="Build preset (can be specified multiple times)")
     parser.add_argument("--build_type", action="append", default=[], help="Build type (can be specified multiple times)")
     parser.add_argument("--package", action="append", default=[], help="Package to build (can be specified multiple times)")
-    parser.add_argument("--env", action="append", default=[], help="Environment variable to set (format: VAR=VALUE)")
+    parser.add_argument("--environment", action="append", default=[], help="Environment variable to set (format: VAR=set:VALUE, VAR=append:VALUE, VAR=prepend:VALUE)")
     parser.add_argument("--stage", default="BUILD_ENGINE_STAGE", help="Build stage (default: BUILD_ENGINE_STAGE)")
 
     args = parser.parse_args()
@@ -34,15 +34,15 @@ def main():
     # Prepare environment variables with set, append, prepend support
     import os
     env = os.environ.copy()
-    for env_arg in args.env:
-        if '+=' in env_arg:
-            k, v = env_arg.split('+=', 1)
+    for env_arg in args.environment:
+        if '=append:' in env_arg:
+            k, v = env_arg.split('=append:', 1)
             env[k] = env.get(k, '') + v
-        elif '^=' in env_arg:
-            k, v = env_arg.split('^=', 1)
+        elif '=prepend:' in env_arg:
+            k, v = env_arg.split('=prepend:', 1)
             env[k] = v + env.get(k, '')
-        elif '=' in env_arg:
-            k, v = env_arg.split('=', 1)
+        elif '=set:' in env_arg:
+            k, v = env_arg.split('=set:', 1)
             env[k] = v
 
     for preset in presets:
