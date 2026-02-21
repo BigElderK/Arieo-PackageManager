@@ -20,7 +20,7 @@ include(FetchContent)
 function(arieo_add_remote_package)
     cmake_parse_arguments(ARG 
         ""
-        "GIT_REPOSITORY;GIT_TAG;" 
+        "GIT_REPOSITORY;GIT_TAG;OUT_PACKAGE_DIR" 
         "" 
         ${ARGN}
     )
@@ -36,12 +36,12 @@ function(arieo_add_remote_package)
     message(STATUS "Adding remote package: 
         GIT_REPOSITORY=${ARG_GIT_REPOSITORY}
         GIT_TAG=${ARG_GIT_TAG}
-        SOURCE_DIR=$ENV{ARIEO_PACKAGES_REMOTE_SOURCE_DIR}/${package_name}
+        SOURCE_DIR=$ENV{ARIEO_PACKAGES_DEFAULT_REMOTE_SOURCE_DIR}/${package_name}
         BINARY_DIR=$ENV{ARIEO_PACKAGES_BUILD_OUTPUT_DIR}/${package_name}
     ")
 
     # If SOURCE_DIR does not exist, call git clone to SOURCE_DIR, otherwise update it with git pull
-    set(source_dir $ENV{ARIEO_PACKAGES_REMOTE_SOURCE_DIR}/${package_name})
+    set(source_dir $ENV{ARIEO_PACKAGES_DEFAULT_REMOTE_SOURCE_DIR}/${package_name})
     if(NOT EXISTS ${source_dir})
         execute_process(
             COMMAND git clone --branch ${ARG_GIT_TAG} --depth 1 ${ARG_GIT_REPOSITORY} ${source_dir}
@@ -65,9 +65,7 @@ function(arieo_add_remote_package)
         message(FATAL_ERROR "Local package source directory ${source_dir} does not contain a CMakeLists.txt file.")
     endif()
 
-    add_subdirectory(
-        ${source_dir}
-    )
+    set(${ARG_OUT_PACKAGE_DIR} "${source_dir}" PARENT_SCOPE)
 endfunction()
 
 
