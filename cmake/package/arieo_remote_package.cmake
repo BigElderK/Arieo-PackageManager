@@ -38,7 +38,6 @@ function(arieo_add_remote_package)
         GIT_TAG=${ARG_GIT_TAG}
         SOURCE_DIR=$ENV{ARIEO_PACKAGES_REMOTE_SOURCE_DIR}/${package_name}
         BINARY_DIR=$ENV{ARIEO_PACKAGES_BUILD_OUTPUT_DIR}/${package_name}
-        INSTALL_DIR=$ENV{ARIEO_PACKAGES_INSTALL_DIR}/${package_name}
     ")
 
     # If SOURCE_DIR does not exist, call git clone to SOURCE_DIR, otherwise update it with git pull

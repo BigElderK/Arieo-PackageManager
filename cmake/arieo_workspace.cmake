@@ -82,7 +82,6 @@ function(add_stages)
         INSTALL_THIRD_PARTIES_STAGE
         BUILD_ENGINE_STAGE
         BUILD_APPLICATION_STAGE
-        DEPLOY_STAGE
     )
     cmake_parse_arguments(
         ARGUMENT
@@ -113,12 +112,6 @@ function(add_stages)
     if(DEFINED ARGUMENT_BUILD_APPLICATION_STAGE)
         if("${ARIEO_BUILD_CONFIGURE_STAGE}" STREQUAL "BUILD_APPLICATION_STAGE")
             add_single_stage("${ARGUMENT_BUILD_APPLICATION_STAGE}")
-        endif()
-    endif()
-
-    if(DEFINED ARGUMENT_DEPLOY_STAGE)
-        if("${ARIEO_BUILD_CONFIGURE_STAGE}" STREQUAL "DEPLOY_STAGE")
-            add_single_stage("${ARGUMENT_DEPLOY_STAGE}")
         endif()
     endif()
 endfunction()
