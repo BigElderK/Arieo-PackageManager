@@ -38,12 +38,28 @@ function(ARIEO_WORKSPACE)
         ${ARGN}
     )
 
+    if(DEFINED ARGUMENT_ENVIRONMENT_VARIABLES)
+        apply_environments(${ARGUMENT_ENVIRONMENT_VARIABLES})
+    endif()
+
     if (NOT DEFINED ENV{ARIEO_WORKSPACE_ROOT_DIR})
         message(FATAL_ERROR "Environment variable ARIEO_WORKSPACE_ROOT_DIR is not defined.")
     endif()
 
-    project(ArieoWorkspace)
+    if (NOT DEFINED ENV{ARIEO_PACKAGES_INSTALL_DIR})
+        message(FATAL_ERROR "Environment variable ARIEO_PACKAGES_INSTALL_DIR is not defined.")
+    endif()    
 
+    set(CMAKE_INSTALL_PREFIX ${ARIEO_PACKAGES_INSTALL_DIR}// CACHE PATH "Installation directory for Arieo packages" FORCE)
+
+    project(ArieoWorkspace)
+    if(DEFINED ARGUMENT_STAGES)
+        message(STATUS "[arieo_workspace] Processing stages: ${ARGUMENT_STAGES}")
+        add_stages("${ARGUMENT_STAGES}")
+    endif()
+endfunction()
+
+function(apply_environments environments)
     # Process environment variable settings
     foreach(env_var IN LISTS ARGUMENT_ENVIRONMENT_VARIABLES)
         string(REGEX MATCH "^([A-Za-z_][A-Za-z0-9_]*)=(set|append|prepend):(.+)$" _match "${env_var}")
@@ -71,11 +87,6 @@ function(ARIEO_WORKSPACE)
             message(STATUS "[arieo_workspace] ${operation} ${var_name}=$ENV{${var_name}}")
         endif()
     endforeach()
-
-    if(DEFINED ARGUMENT_STAGES)
-        message(STATUS "[arieo_workspace] Processing stages: ${ARGUMENT_STAGES}")
-        add_stages("${ARGUMENT_STAGES}")
-    endif()
 endfunction()
 
 function(add_stages)

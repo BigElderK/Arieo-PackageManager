@@ -11,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser(description="Build packages using CMake")
     parser.add_argument("--cmake", required=True, help="Path to CMakeLists.txt directory")
     parser.add_argument("--build_dir", required=False, help="Base build output directory (default: <cmake_dir>/build)")
-    parser.add_argument("--install_dir", required=False, help="Base install output directory (default: <cmake_dir>/install)")
+    parser.add_argument("--install", required=False, default=False, help="Whether to install after build (default: False)")
     parser.add_argument("--preset", action="append", default=[], help="Build preset (can be specified multiple times)")
     parser.add_argument("--build_type", action="append", default=[], help="Build type (can be specified multiple times)")
     parser.add_argument("--package", action="append", default=[], help="Package to build (can be specified multiple times)")
@@ -26,7 +26,7 @@ def main():
     build_types = args.build_type if args.build_type else ["Release"]
     packages = args.package
     stage = args.stage
-    base_install_dir = Path(args.install_dir).resolve() if args.install_dir else None
+    install = args.install
 
     packages_str = ";".join(packages) if packages else ""
 
@@ -73,10 +73,10 @@ def main():
                     f"-DCMAKE_BUILD_TYPE={build_type}",
                 ]
 
-            if(base_install_dir):
-                configure_cmd += [
-                    f"-DCMAKE_INSTALL_PREFIX={base_install_dir}"
-                ]
+            # if(base_install_dir):
+            #     configure_cmd += [
+            #         f"-DCMAKE_INSTALL_PREFIX={base_install_dir}"
+            #     ]
 
             result = subprocess.run(configure_cmd, env=env)
             if result.returncode != 0:
@@ -109,7 +109,7 @@ def main():
                 print(f"Build failed for preset={preset}, build_type={build_type}, stage={stage}")
                 return result.returncode
 
-            if(base_install_dir):
+            if(install):
                 print(f"\n=== Installing: preset={preset}, build_type={build_type}, stage={stage} ===")
                 install_cmd = [
                     "cmake",
