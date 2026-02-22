@@ -19,9 +19,6 @@
 ]]
 cmake_minimum_required(VERSION 4.2.3) 
 
-include(${CMAKE_CURRENT_LIST_DIR}/package/arieo_remote_package.cmake)
-include(${CMAKE_CURRENT_LIST_DIR}/package/arieo_local_package.cmake)
-
 function(ARIEO_WORKSPACE)
     set(oneValueArgs
     )
@@ -357,7 +354,14 @@ function(add_stage_packages package_links)
         add_subdirectory("${path}")
     endforeach()
 
-    # message(FATAL_ERROR "WOKAO")
+    # output a yaml file with the list of packages and their resolved paths for this stage (for debugging/verification)
+    set(output_yaml "${ARIEO_WORKSPACE_ROOT_DIR}/workspace_packages.yaml")
+    file(WRITE "${output_yaml}" "packages:\n")
+    foreach(path IN LISTS sorted_paths)
+        string(REGEX REPLACE "^.*/([^/]+)$" "\\1" pkg_name "${path}")
+        file(APPEND "${output_yaml}" "  - name: ${pkg_name}\n")
+        file(APPEND "${output_yaml}" "    path: ${path}\n")
+    endforeach()
 endfunction()
 
 function (parsing_pakage_link_string package_link out_type out_url out_local_path)
